@@ -20,17 +20,17 @@
 #
 
 import sys
-import os.path
 import vlc
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtGui import QWidget
+
+from Messenger import Messenger
 
 
-class Player(QWidget):
+class Player(QtGui.QMainWindow):
     """A simple Media Player using VLC and Qt
     """
     def __init__(self, master=None):
-        QtGui.QWidget.__init__(self, master)
+        QtGui.QMainWindow.__init__(self, master)
         self.setWindowTitle("Media Player")
 
         # creating a basic vlc instance
@@ -92,16 +92,6 @@ class Player(QWidget):
 
         self.widget.setLayout(self.vboxlayout)
 
-        open = QtGui.QAction("&Open", self)
-        self.connect(open, QtCore.SIGNAL("triggered()"), self.OpenFile)
-        exit = QtGui.QAction("&Exit", self)
-        self.connect(exit, QtCore.SIGNAL("triggered()"), sys.exit)
-        menubar = self.menuBar()
-        filemenu = menubar.addMenu("&File")
-        filemenu.addAction(open)
-        filemenu.addSeparator()
-        filemenu.addAction(exit)
-
         self.timer = QtCore.QTimer(self)
         self.timer.setInterval(200)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"),
@@ -123,6 +113,16 @@ class Player(QWidget):
             self.timer.start()
             self.isPaused = False
 
+    def closeEvent(self, QCloseEvent):
+        """
+        Stop media player on window close event
+        :param QCloseEvent:
+        :return:
+        """
+        self.mediaplayer.stop()
+        self.mediaplayer.release()
+        Messenger.main_window.player = None
+
     def Stop(self):
         """Stop player
         """
@@ -132,11 +132,6 @@ class Player(QWidget):
     def OpenFile(self, filename=None):
         """Open a media file in a MediaPlayer
         """
-        if filename is None:
-            filename = QtGui.QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'))
-        if not filename:
-            return
-
         # create the media
         if sys.version < '3':
             filename = unicode(filename)
@@ -176,6 +171,35 @@ class Player(QWidget):
         # uses integer variables, so you need a factor; the higher the
         # factor, the more precise are the results
         # (1000 should be enough)
+
+    def setTime(self, position):
+        """
+        Set position of video in ms
+        :param position:
+        :return:
+        """
+        self.mediaplayer.set_time(position)
+
+    def getPosition(self):
+        """
+        Get Video Position
+        """
+        return self.mediaplayer.get_time()
+
+    def getLength(self):
+        """
+        Get video length
+        :return:
+        """
+        return self.mediaplayer.get_length()
+
+    def getVideoSize(self):
+        """
+        Return video size
+        :return:
+        """
+        video_size = self.mediaplayer.video_get_size()
+        return video_size
 
     def updateUI(self):
         """updates the user interface"""

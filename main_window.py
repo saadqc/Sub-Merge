@@ -1,24 +1,43 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'hardsubhWnd.ui'
-#
-# Created by: PyQt4 UI code generator 4.11.4
-#
-# WARNING! All changes made in this file will be lost!
-import base64
-import json
+
+"""
+
+Main Window app to render and execute user actions.
+
+Author: Saad Abdullah
+Email: saad_lah@hotmail.com
+       saadfast.qc@gmail.com
+
+This file is part of Sub-Merge app.
+
+Sub-Merge is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Sub-Merge is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+"""
+
+import copy
 import os
+
+from pysrt import SubRipTime
+from PyQt4 import QtCore, QtGui
+
 import sys
 
-import pysrt as pysrt
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtGui import QFileDialog, QDialog
+from PyQt4.QtGui import QStandardItemModel, QStandardItem, QMessageBox
 
-from modules.MainWindowUI import Ui_MainWindow
-from modules.SubtitleTableModel import SubtitleTableModel
-
-from modules.SubtitleWindowUI import Ui_SubtitleDialog
-from modules.qt_videoframe import QtCapture
+from ConcatenateDialoge import Ui_ConcatenateDialog
+from Messenger import Messenger
+from SubMergeUI import Ui_MainWindow
+from SubtitleTab import SubtitleTabHelper
+from VideoPlayer import Player
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -27,64 +46,11 @@ except AttributeError:
         return s
 
 
-class SubtitleApp(QtGui.QDialog, Ui_SubtitleDialog):
+class ConcatenateDialog(QtGui.QDialog, Ui_ConcatenateDialog):
     def __init__(self, parent=None):
-        QtGui.QDialog.__init__(self, parent=parent)
-        Ui_SubtitleDialog.__init__(self)
+        QtGui.QDialog.__init__(self, parent)
+        Ui_ConcatenateDialog.__init__(self)
         self.setupUi(self)
-        self.btn_save.clicked.connect(self.save_subtitles)
-        self.btn_concatenate.clicked.connect(self.concatenate_subtitle)
-        self.btn_delete.clicked.connect(self.delete_subtitle)
-
-        # Variables scope
-        self.output_srt = None
-
-    def open_subtitle(self, subtitle_file):
-        """
-
-        :return:
-        """
-        self.subtitle_file = subtitle_file
-        subs = pysrt.open(self.subtitle_file)
-        self.sub_data = subs
-        self.table_model = SubtitleTableModel(self.sub_data, headers=['idx', 'Time codes', 'Subtitle Text'])
-        self.table_subtitles.setModel(self.table_model)
-
-    def save_subtitles(self):
-        """
-
-        :param file_name:
-        :return:
-        """
-        if not self.output_srt:
-            fileName = QtGui.QFileDialog.getSaveFileName(self, 'Save srt', '/home/saad/',
-                                                         selectedFilter='*.srt')
-
-            if str(fileName):
-                self.output_srt = fileName
-
-        if self.output_srt:
-            self.sub_data.save(path=self.output_srt, encoding='utf-8')
-
-    def concatenate_subtitle(self):
-        """
-
-        :return:
-        """
-        selected_subs = self.table_subtitles.selectedIndexes()
-        rows = [sub.row() for idx, sub in enumerate(selected_subs) if idx % 3 == 0]
-        rows = sorted(rows)
-        self.sub_data[rows[0]].end = self.sub_data[rows[-1]].end
-        del self.sub_data[rows[1]:rows[-1] + 1]
-
-    def delete_subtitle(self):
-        """
-
-        :return:
-        """
-        selected_subs = self.table_subtitles.selectedIndexes()
-        rows = [sub.row() for idx, sub in enumerate(selected_subs) if idx % 3 == 0]
-        del self.sub_data[rows[0]:rows[-1]+1]
 
 
 class MainApp(QtGui.QMainWindow, Ui_MainWindow):
@@ -92,6 +58,13 @@ class MainApp(QtGui.QMainWindow, Ui_MainWindow):
         QtGui.QMainWindow.__init__(self)
         Ui_MainWindow.__init__(self)
         self.setupUi(self)
+
+        # Update UI
+        self.menubar.setStyleSheet("QMenuBar::item { background-color: rgb(77, 77, 77); }")
+        self.subtitleTabs.setStyleSheet("QTabBar::item { background-color: rgb(77, 77, 77); }")
+        styles = [x for x in QtGui.QStyleFactory.keys()]
+        QtGui.qApp.setStyle(str(styles[-1]))
+
         self.initialize_components()
 
         """
@@ -104,214 +77,271 @@ class MainApp(QtGui.QMainWindow, Ui_MainWindow):
         :return:
         """
 
-        self.actionExit.triggered.connect(QtGui.qApp.quit)
-        self.actionOpen.triggered.connect(self.btn_click_open)
-        self.actionSave_Profile.triggered.connect(self.action_save_profile)
-        self.actionLoad_Profile.triggered.connect(self.action_load_profile)
-        self.actionOpen_SRT_file.triggered.connect(self.action_load_subtitle)
-        self.actionAuto_Tesseract.triggered.connect(self.auto_tesseract_changed)
-        self.wordspace_checkbox.stateChanged.connect(self.wordspace_checkbox_changed)
-        self.autotranslate_checkbox.stateChanged.connect(self.checkbox_autotranslate_changed)
-        self.actionSet_Output_SRT.triggered.connect(self.btn_click_set_output_srt)
-        self.spin_height.valueChanged.connect(self.spin_changed_rect)
-        self.spin_xoffset.valueChanged.connect(self.spin_changed_rect)
-        self.spin_lines.valueChanged.connect(self.spin_changed_rect)
-        self.spin_yoffset.valueChanged.connect(self.spin_changed_rect)
-        self.spin_line_distance.valueChanged.connect(self.spin_changed_rect)
-        self.spin_space_cond.valueChanged.connect(self.wordspace_checkbox_changed)
-        self.spin_space.valueChanged.connect(self.wordspace_checkbox_changed)
-        self.threshold_slider.valueChanged.connect(self.pre_processing_attrs_changed)
-        self.fill_threshold_slider.valueChanged.connect(self.post_process_attrs_update)
-        self.next_frame_btn.clicked.connect(self.next_frame)
-        self.restart_btn.clicked.connect(self.play_again)
-        self.btn_run.clicked.connect(self.run_simulation)
-        self.btn_stop.clicked.connect(self.stop_simulation)
-        self.actionExport_Post_Processing_Image.triggered.connect(self.export_pp_image)
-        self.btn_tesseract.clicked.connect(self.ocr_tessract)
-        self.btn_use_google.clicked.connect(self.translate_via_google)
-        self.btn_use_microsoft.clicked.connect(self.translate_via_microsoft)
-        self.OK_btn.clicked.connect(self.OK_btn_clicked)
-        self.actionSubtitle_Window.triggered.connect(self.open_subtitle_dialoge)
+        self.actionOpen_Video.triggered.connect(self.open_media)
+        self.actionOpen_Subtitle.triggered.connect(self.open_subtitle)
+        self.actionConcatenate.triggered.connect(self.concatenate_tabs)
+        self.actionDelete.triggered.connect(self.delete_subtitles)
+        self.actionBreak_Selected_Subtitles.triggered.connect(self.create_subtitles)
+        self.actionSet_to_Current_Position.triggered.connect(self.set_to_current_video_position)
+        # self.actionSave.triggered.connect(self.save_subtitle)
+        self.actionSave_As.triggered.connect(self.save_subtitle_as)
+        self.actionAbout.triggered.connect(self.about_message)
+        self.actionExit.triggered.connect(self.exit_app)
 
-        self.subtitle_dialoge = SubtitleApp(self)
-        self.subtitle_dialoge.table_subtitles.doubleClicked.connect(self.subtitle_clicked)
+        self.tab_helper = SubtitleTabHelper(self.subtitleTabs)
+        self.subtitleTabs.tabCloseRequested.connect(self.on_tab_close)
 
-        self.capture = None
-        self.output_srt = None
+        self.filename = None
+        self.player = None
+        self.current_subtitle_data = None
+        self.timer = None
+
+        Messenger.main_window = self
+
+    def exit_app(self):
+        """
+        Close app
+        :return:
+        """
+        self.close()
 
     def closeEvent(self, QCloseEvent):
-        self.subtitle_dialoge.close()
+        """
+        Release vlc resources
+        :param QCloseEvent:
+        :return:
+        """
 
-    def open_subtitle_dialoge(self):
-        self.subtitle_dialoge.show()
+        if self.player:
+            self.player.close()
+            self.player = None
 
-    def subtitle_clicked(self):
-        selected_row = self.subtitle_dialoge.table_subtitles.selectedIndexes()[0].row()
-        subtitle = self.subtitle_dialoge.sub_data[selected_row]
-        # Time in miliseconds
-        _time = subtitle.start.hours * 60 * 60 * 1000 + subtitle.start.minutes * 60 * 1000 + subtitle.start.seconds * 1000 + subtitle.start.milliseconds
-        self.capture.seek_video(_time, subtitle.text)
-
-    def btn_click_open(self):
-        fname = QFileDialog.getOpenFileName(self, 'Open file',
-                                            '/home/saad/videos/', "Media files (*.jpg *.png *.mp4 *.avi)")
-
-        # # # TODO: remove this
-        # fname = '/home/saad/Videos/Kiralik Ask Episode 4.MP4'
-
-        self.setWindowTitle(os.path.basename(str(fname)))
-
-        if str(fname):
-            self.capture = QtCapture(fname)
-            self.capture.reference_components(video_frame=self.label, pre_processing_frame=self.pre_processing_frame,
-                                              post_processing_frame=self.post_processing_frame,
-                                              guess_label=self.guess_by_tesseract,
-                                              google_label=self.label_google,
-                                              microsoft_label=self.label_microsoft,
-                                              hWnd_subtitle=self.subtitle_dialoge,
-                                              hWnd_main=self)
-            self.pre_processing_attrs_changed()
-            self.post_process_attrs_update()
-            self.spin_changed_rect()
-            self.wordspace_checkbox_changed()
-            self.checkbox_autotranslate_changed()
-            self.auto_tesseract_changed()
-            self.capture.start()
-
-    def wordspace_checkbox_changed(self):
-        if not self.capture:
+    def open_media(self):
+        """
+        Open media file in vlc player
+        :return:
+        """
+        self.filename = QtGui.QFileDialog.getOpenFileName(self, "Open Media File", os.path.expanduser('~'),
+                                                          "Media files (*.mp4 *.mp3 *.avi *.MP4 *.mkv *.flv)")
+        if not self.filename:
             return
 
-        self.capture.wordspace_checked(self.wordspace_checkbox.isChecked(), self.spin_space.value(),
-                                       self.spin_space_cond.value())
+        if self.player:
+            self.player.close()
+            self.player = None
 
-    def btn_click_set_output_srt(self):
-        fileName = QtGui.QFileDialog.getSaveFileName(self, 'Save srt', '/home/saad/Videos',
+        self.player = Player()
+        self.player.OpenFile(self.filename)
+
+        Messenger.media_player = self.player
+
+        _size = self.player.getVideoSize()
+
+        self.player.resize(*_size)
+        self.player.show()
+
+        # Reset volume to zero
+        self.player.setVolume(0)
+
+        self.update_subtitle_view()
+
+        if self.timer:
+           self.timer.stop()
+           self.timer = None
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_subtitle_selection)
+        self.timer.start(50)
+
+    def open_subtitle(self):
+        """
+        Open subtitle file in a tab
+        :return:
+        """
+        sub_filename = QtGui.QFileDialog.getOpenFileName(self, "Open Subtitle File", os.path.expanduser('~'),
+                                                         "SubRip files (*.srt)")
+        if not sub_filename:
+            return
+        tab = self.tab_helper.create_tab_from_file(sub_filename)
+        tab.findChild(QtGui.QTableView).doubleClicked.connect(self.on_subtitle_select)
+
+    def save_subtitle(self):
+        """
+        Save subtitle to file
+        :return:
+        """
+        pass
+
+    def save_subtitle_as(self):
+        """
+        Save subtitle to file and enforce save dialog
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+
+        if not table:
+            return
+
+        sub_data = table.model().get_data()
+        fileName = QtGui.QFileDialog.getSaveFileName(self, 'Save srt', os.path.expanduser('~'),
                                                      selectedFilter='*.srt')
-        if str(fileName):
-            self.subtitle_dialoge.output_srt = fileName
-            # If there is no file, create it...Otherwise load it..
-            if not os.path.isfile(fileName):
-                with open(fileName, mode='w'):
-                    pass
-            self.subtitle_dialoge.open_subtitle(fileName)
-            self.update_srt_data()
 
-    def update_srt_data(self):
-        self.capture.update_srt_data(self.subtitle_dialoge.sub_data)
-
-    def spin_changed_rect(self):
-        if not self.capture:
+        if not fileName:
             return
-        self.capture.set_rect(self.spin_yoffset.value(), self.spin_xoffset.value(), self.spin_height.value(),
-                              self.spin_lines.value(), self.spin_line_distance.value())
 
-    def pre_processing_attrs_changed(self):
-        self.thresold_slider_label.setText(str(self.threshold_slider.value()))
-        self.fill_threshold_slider.setMaximum(self.threshold_slider.value())
-        self.post_process_checkbox.setText('Post-Processing (0-{})'.format(self.threshold_slider.value()))
-        if not self.capture:
+        sub_data.save(fileName)
+
+    def about_message(self):
+        """
+        Show about message box of developer
+        :return:
+        """
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setText("This app is developed by Saad Abdullah. In case of any queries, please send an email to saad_lah@hotmail.com.")
+        msg.setWindowTitle("Developer!")
+        msg.exec_()
+
+    def on_subtitle_select(self, index):
+        """
+        On subtitle select, set video time to subtitle
+        :return:
+        """
+        row = index.row()
+        sub_item = self.tab_helper.get_selected_table().model().get_data()[row]
+        _time = sub_item.start
+
+        if self.player:
+            self.player.setTime(_time.ordinal)
+
+    def on_tab_close(self, index):
+        """
+        Event handler..remove tab on tab close
+        :param index:
+        :return:
+        """
+        self.tab_helper.remove_tab(index)
+
+    def concatenate_tabs(self):
+        """
+        Concatenate two or more tabs and create another tab as a combination
+        :return:
+        """
+        dialoge = ConcatenateDialog(self)
+        dialoge.accepted.connect(self.concatenate_tabs_ok)
+        model = QStandardItemModel(dialoge.listView)
+        [model.appendRow(QStandardItem(_entry)) for _entry in self.tab_helper.tabs]
+        dialoge.listView.setModel(model)
+        dialoge.show()
+        self.concatenate_listview = dialoge.listView
+
+    def concatenate_tabs_ok(self):
+        """
+        Event handler after user presses OK in concatenate dialog. Concatenate those tab and generate a new tab
+        :return:
+        """
+        selected_indexes = sorted(list(set([index.row() for index in self.concatenate_listview.selectedIndexes()])))
+        if len(selected_indexes) >= 2:
+            tab_names = [item for idx, item in enumerate(self.tab_helper.tabs) if idx in selected_indexes]
+            table_views = self.tab_helper.get_tabs(_filter=tab_names)
+            sub_data = [table_view.model().get_data() for table_view in table_views]
+            sub_data = copy.deepcopy(sum(sub_data, []))
+            sub_data = sorted(sub_data, key=lambda x: x.start)
+
+            # Re-index all subtitles
+            _index = 1
+            for idx, item in enumerate(sub_data):
+                item.index = _index
+                _index += 1
+
+            self.tab_helper.create_tab('output', sub_data)
+
+    def create_subtitles(self):
+        """
+        Create subtitles tab from selected subtitles
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+        if not table:
+            return None
+        selected_indexes = sorted(list(set([index.row() for index in table.selectedIndexes()])))
+
+        if len(selected_indexes) >= 2:
+            sub_data = table.model().get_data()[selected_indexes[0]:selected_indexes[-1]+1]
+            self.tab_helper.create_tab('output', sub_data)
+
+    def delete_subtitles(self):
+        """
+        Delete selected subtitles rows in a tab
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+        if not table:
+            return None
+        selected_indexes = sorted(list(set([index.row() for index in table.selectedIndexes()])))
+
+        if selected_indexes:
+            table.model().removeRows(selected_indexes[0], len(selected_indexes))
+
+    def set_to_current_video_position(self):
+        """
+        Set the current selected subtitles to current video location
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+        if not table or not self.player:
+            return None
+        selected_indexes = sorted(list(set([index.row() for index in table.selectedIndexes()])))
+
+        if len(selected_indexes) >= 1:
+            sub_data = table.model().get_data()[selected_indexes[0]:selected_indexes[-1] + 1]
+            current_video_time = SubRipTime.coerce(int(self.player.getPosition()))
+
+            # Find delta between current video time and current selected subtitle time. Then add delta to all subtitle
+            # start and end
+            delta = current_video_time - sub_data[0].start
+            for item in sub_data:
+                item.start = item.start + delta
+                item.end = item.end + delta
+
+            self.update_subtitle_view()
+
+    def update_subtitle_view(self):
+        """
+
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+        if not self.player or not table:
             return
-        self.capture.set_pre_processing_attrs(self.threshold_slider.value(), self.spin_min_pixels.value())
+        self.current_subtitle_data = table.model().get_data()
+        self.current_subtitle_data = sorted(self.current_subtitle_data, key=lambda x: x.start)
+        media_position = self.player.getPosition()
+        _time = SubRipTime.coerce(media_position)
+        indicies = [idx for idx, item in enumerate(self.current_subtitle_data) if item.start <= _time <= item.end]
+        self.current_idx = indicies[0] if indicies else None
 
-    def post_process_attrs_update(self):
-        self.capture.set_post_processing_attrs(self.fill_threshold_slider.value(), self.post_process_checkbox.isChecked())
+    def update_subtitle_selection(self):
+        """
+        Set the subtitle selection to current video time.
+        :return:
+        """
+        table = self.tab_helper.get_selected_table()
+        if not self.player or not table:
+            return
 
-    def next_frame(self):
-        self.capture.next_frame()
+        media_position = self.player.getPosition()
+        _time = SubRipTime.coerce(media_position)
 
-    def play_again(self):
-        self.capture.play_again()
+        if not self.current_idx:
+            self.update_subtitle_view()
+            return
 
-    def run_simulation(self):
-        self.capture.run_simulation()
-
-    def stop_simulation(self):
-        self.capture.stop_simulation()
-
-    def export_pp_image(self):
-        self.capture.export_pp_image()
-
-    def ocr_tessract(self):
-        self.capture.ocr_tessract()
-
-    def OK_btn_clicked(self):
-        self.capture.commit_subtitle()
-
-    def checkbox_autotranslate_changed(self):
-        self.capture.auto_translate(self.autotranslate_checkbox.isChecked())
-
-    def action_save_profile(self):
-        fileName = QtGui.QFileDialog.getSaveFileName(self, 'Save Profile', '/home/saad/',
-                                                     selectedFilter='*.hde')
-
-        if str(fileName).strip():
-            data = {
-                'height_value': self.spin_height.value(),
-                'yoffset_value': self.spin_yoffset.value(),
-                'xoffset_value': self.spin_xoffset.value(),
-                'line_distance_value': self.spin_line_distance.value(),
-                'min_pixels': self.spin_min_pixels.value(),
-                'post_processing_check': self.post_process_checkbox.isChecked(),
-                'post_processing_value': self.fill_threshold_slider.value(),
-                'auto_tesseract': self.actionAuto_Tesseract.isChecked(),
-                'pre_processing_value': self.threshold_slider.value(),
-                'auto_translate': self.autotranslate_checkbox.isChecked(),
-                'space_value': self.spin_space.value(),
-                'space_value_cond': self.spin_space_cond.value(),
-                'word_spacing_check': self.wordspace_checkbox.isChecked(),
-                'lines_value': self.spin_lines.value()
-            }
-            with open(fileName, 'w') as output_file:
-                output_file.write(base64.encodestring(json.dumps(data)))
-
-    def action_load_profile(self):
-        fname = QFileDialog.getOpenFileName(self, 'Open Profile',
-                                            '/home/saad/Videos', "Profile files (*.hde)")
-        # fname = '/home/saad/Videos/KA_Ep_4.hde'
-        if str(fname).strip():
-            try:
-                with open(fname) as input_file:
-                    data = json.loads(base64.decodestring(input_file.read()))
-                    self.spin_lines.setValue(data['lines_value'])
-                    self.spin_line_distance.setValue(data['line_distance_value'])
-                    self.spin_xoffset.setValue(data['xoffset_value'])
-                    self.spin_yoffset.setValue(data['yoffset_value'])
-                    self.spin_height.setValue(data['height_value'])
-                    self.spin_min_pixels.setValue(data['min_pixels'])
-                    self.spin_space.setValue(data['space_value'])
-                    self.spin_space_cond.setValue(data['space_value_cond'])
-                    self.wordspace_checkbox.setChecked(data['word_spacing_check'])
-                    self.post_process_checkbox.setChecked(data['post_processing_check'])
-                    self.actionAuto_Tesseract.setChecked(data['auto_tesseract'])
-                    self.fill_threshold_slider.setValue(data['post_processing_value'])
-                    self.threshold_slider.setValue(data['pre_processing_value'])
-
-                    # Update
-                    self.spin_changed_rect()
-                    self.pre_processing_attrs_changed()
-                    self.post_process_attrs_update()
-                    self.wordspace_checkbox_changed()
-                    self.checkbox_autotranslate_changed()
-                    self.auto_tesseract_changed()
-            except Exception as e:
-                print e.message
-
-    def action_load_subtitle(self):
-        fname = QFileDialog.getOpenFileName(self, 'Open Profile',
-                                            '/home/saad/Videos/', "Profile files (*.srt)")
-
-        if str(fname).strip():
-            self.subtitle_dialoge.open_subtitle(fname)
-
-    def auto_tesseract_changed(self):
-        self.capture.auto_tesseract_checked(self.actionAuto_Tesseract.isChecked())
-
-    def translate_via_google(self):
-        self.capture.translate_via_google()
-
-    def translate_via_microsoft(self):
-        self.capture.translate_via_microsoft()
+        item = self.current_subtitle_data[self.current_idx]
+        if item.start <= _time <= item.end:
+            table.selectRow(self.current_idx)
+        elif item.end < _time:
+            self.current_idx += 1
 
 
 def main():

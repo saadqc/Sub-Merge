@@ -31,6 +31,9 @@ class SubtitleTableModel(QtCore.QAbstractTableModel):
             else:
                 return value.text
 
+    def get_data(self):
+        return self.__data
+
     def setData(self, index, value, role=QtCore.Qt.EditRole):
         if role == QtCore.Qt.EditRole:
 
@@ -71,17 +74,9 @@ class SubtitleTableModel(QtCore.QAbstractTableModel):
 
         return True
 
-    def insertColumns(self, position, columns, parent=QtCore.QModelIndex()):
-        self.beginInsertColumns(parent, position, position + columns - 1)
-
-        rowCount = len(self.__data)
-
-        for i in range(columns):
-            for j in range(rowCount):
-                self.__data[j].insert(position, SubtitleItem())
-
-        self.endInsertColumns()
+    def removeRows(self, position, rows=1, index=QtCore.QModelIndex()):
+        self.beginRemoveRows(QtCore.QModelIndex(), position, position + rows - 1)
+        self.__data = self.__data[:position] + self.__data[position + rows:]
+        self.endRemoveRows()
 
         return True
-
-
