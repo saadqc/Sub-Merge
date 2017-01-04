@@ -95,6 +95,7 @@ class MainApp(QtGui.QMainWindow, Ui_MainWindow):
         self.player = None
         self.current_subtitle_data = None
         self.timer = None
+        self.current_idx = None
 
         Messenger.main_window = self
 
