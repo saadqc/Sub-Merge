@@ -37,6 +37,11 @@ from ConcatenateDialoge import Ui_ConcatenateDialog
 from Messenger import Messenger
 from SubMergeUI import Ui_MainWindow
 from SubtitleTab import SubtitleTabHelper
+
+# Set VLC plugin path
+if not os.environ.get('VLC_PLUGIN_PATH'):
+    os.environ['VLC_PLUGIN_PATH'] = 'plugins/'
+
 from VideoPlayer import Player
 
 try:

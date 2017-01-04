@@ -12,7 +12,6 @@ env/
 build/
 .idea/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
