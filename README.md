@@ -1,7 +1,10 @@
-# Initial README
+# Sub-Merge
 
-Build:
+Merge multiple subtitle files and sync them into one.
+
+
+## Build:
 sudo pyinstaller --onefile --noupx main_window.py
 
-Export Vlc Plugin Environment Variable:
+## Export Vlc Plugin Environment Variable:
 export VLC_PLUGIN_PATH=/usr/lib/vlc/plugins
