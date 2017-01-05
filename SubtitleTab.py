@@ -43,9 +43,13 @@ class SubtitleTabHelper(object):
         :return:
         """
         # Get name of subtitle for tab title
-        name = os.path.basename(os.path.splitext(str(sub_filename))[0])
+        name = os.path.basename(os.path.splitext(unicode(sub_filename))[0])
 
-        subs = pysrt.open(sub_filename)
+        try:
+            subs = pysrt.open(unicode(sub_filename))
+        except Exception as e:
+            print e.message
+            subs = pysrt.open(unicode(sub_filename), encoding='latin')
         return self.create_tab(name, subs)
 
     def create_tab(self, name, sub_data):

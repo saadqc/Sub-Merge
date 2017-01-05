@@ -113,6 +113,13 @@ class Player(QtGui.QMainWindow):
             self.timer.start()
             self.isPaused = False
 
+    def isPaused(self):
+        """
+
+        :return:
+        """
+        return not self.mediaplayer.is_playing()
+
     def closeEvent(self, QCloseEvent):
         """
         Stop media player on window close event

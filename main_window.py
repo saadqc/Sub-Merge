@@ -333,7 +333,7 @@ class MainApp(QtGui.QMainWindow, Ui_MainWindow):
         :return:
         """
         table = self.tab_helper.get_selected_table()
-        if not self.player or not table:
+        if not self.player or not table or self.player.isPaused:
             return
 
         media_position = self.player.getPosition()
